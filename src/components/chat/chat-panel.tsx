@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Briefcase, MapPin, Scale, MessagesSquare } from "lucide-react";
+import { Briefcase, MapPin, Scale, MessagesSquare, Maximize2, Minimize2 } from "lucide-react";
 import type { Citation, ThreadKind } from "@/lib/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChatThread } from "@/components/chat/chat-thread";
@@ -12,6 +12,8 @@ interface ChatPanelProps {
   onCitation: (c: Citation) => void;
   defaultThread?: ThreadKind;
   threads?: ThreadKind[];
+  isExpanded?: boolean;
+  onToggleExpanded?: () => void;
 }
 
 const threadMeta: Record<ThreadKind, { label: string; icon: React.ComponentType<{ className?: string }>; suggestions: string[] }> = {
@@ -55,13 +57,13 @@ const threadMeta: Record<ThreadKind, { label: string; icon: React.ComponentType<
   },
 };
 
-export function ChatPanel({ propertyId, propertyIds, onCitation, defaultThread = "general", threads = ["general", "financial", "legal", "location"] }: ChatPanelProps) {
+export function ChatPanel({ propertyId, propertyIds, onCitation, defaultThread = "general", threads = ["general", "financial", "legal", "location"], isExpanded, onToggleExpanded }: ChatPanelProps) {
   const [active, setActive] = useState<ThreadKind>(defaultThread);
 
   return (
     <Tabs value={active} onValueChange={(v) => setActive(v as ThreadKind)} className="flex h-full min-h-0 flex-col">
-      <div className="border-b px-3 py-2">
-        <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${threads.length}, minmax(0, 1fr))` }}>
+      <div className="flex items-center gap-2 border-b px-3 py-2">
+        <TabsList className="grid flex-1" style={{ gridTemplateColumns: `repeat(${threads.length}, minmax(0, 1fr))` }}>
           {threads.map((t) => {
             const meta = threadMeta[t];
             const Icon = meta.icon;
@@ -73,6 +75,17 @@ export function ChatPanel({ propertyId, propertyIds, onCitation, defaultThread =
             );
           })}
         </TabsList>
+        {onToggleExpanded && (
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            aria-label={isExpanded ? "Collapse chat" : "Expand chat"}
+            title={isExpanded ? "Collapse chat" : "Expand chat"}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </button>
+        )}
       </div>
       {threads.map((t) => (
         <TabsContent key={t} value={t} className="m-0 flex-1 min-h-0 data-[state=inactive]:hidden">

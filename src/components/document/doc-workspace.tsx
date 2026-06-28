@@ -8,6 +8,7 @@ import { PropertyDashboard } from "@/components/panels/property-dashboard";
 import { PaymentTimeline } from "@/components/panels/payment-timeline";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface DocWorkspaceProps {
   property: Property;
@@ -17,6 +18,7 @@ interface DocWorkspaceProps {
 export function DocWorkspace({ property, doc }: DocWorkspaceProps) {
   const viewerRef = useRef<PdfViewerHandle | null>(null);
   const [highlightPage, setHighlightPage] = useState<number | undefined>(undefined);
+  const [chatExpanded, setChatExpanded] = useState(false);
 
   function handleCitation(c: Citation) {
     setHighlightPage(c.page);
@@ -38,8 +40,18 @@ export function DocWorkspace({ property, doc }: DocWorkspaceProps) {
           </div>
         </section>
 
-        <aside className="flex min-h-0 w-full max-w-[480px] flex-col border-l bg-background">
-          <ChatPanel propertyId={property.id} onCitation={handleCitation} />
+        <aside
+          className={cn(
+            "flex min-h-0 flex-col border-l bg-background",
+            chatExpanded ? "flex-1" : "w-[480px] shrink-0",
+          )}
+        >
+          <ChatPanel
+            propertyId={property.id}
+            onCitation={handleCitation}
+            isExpanded={chatExpanded}
+            onToggleExpanded={() => setChatExpanded((v) => !v)}
+          />
         </aside>
       </div>
 

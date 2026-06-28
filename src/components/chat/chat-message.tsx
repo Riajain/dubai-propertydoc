@@ -12,51 +12,136 @@ interface ChatMessageProps {
   onCitation: (c: Citation) => void;
 }
 
-function renderInlineContent(content: string): React.ReactNode {
-  if (!content) return null;
-  const terms = glossary.map((g) => g.term).sort((a, b) => b.length - a.length);
-  if (terms.length === 0) return content;
-  const pattern = new RegExp(`\\b(${terms.map(escapeRegex).join("|")})\\b`, "gi");
-  const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-  while ((match = pattern.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(renderMarkdownish(content.slice(lastIndex, match.index), key++));
+type Block =
+  | { type: "paragraph"; text: string }
+  | { type: "bullets"; items: string[] }
+  | { type: "numbered"; items: string[] };
+
+function parseBlocks(content: string): Block[] {
+  const lines = content.split("\n");
+  const blocks: Block[] = [];
+  let currentList: { type: "bullets" | "numbered"; items: string[] } | null = null;
+  let currentPara: string[] = [];
+
+  function flushPara() {
+    if (currentPara.length > 0) {
+      blocks.push({ type: "paragraph", text: currentPara.join(" ") });
+      currentPara = [];
     }
-    const matched = match[0];
-    parts.push(
-      <ConceptPopover key={`t-${key++}`} term={matched}>
-        <span className="cursor-help underline decoration-dotted decoration-muted-foreground/60 underline-offset-2">
-          {matched}
-        </span>
-      </ConceptPopover>,
-    );
-    lastIndex = match.index + matched.length;
   }
-  if (lastIndex < content.length) {
-    parts.push(renderMarkdownish(content.slice(lastIndex), key++));
+  function flushList() {
+    if (currentList) {
+      blocks.push(currentList);
+      currentList = null;
+    }
   }
-  return parts;
+
+  for (const line of lines) {
+    if (line.trim() === "") {
+      flushPara();
+      flushList();
+      continue;
+    }
+    const bulletMatch = line.match(/^[-*]\s+(.*)/);
+    const numMatch = line.match(/^\d+\.\s+(.*)/);
+    if (bulletMatch) {
+      flushPara();
+      if (currentList?.type !== "bullets") {
+        flushList();
+        currentList = { type: "bullets", items: [] };
+      }
+      currentList.items.push(bulletMatch[1]);
+    } else if (numMatch) {
+      flushPara();
+      if (currentList?.type !== "numbered") {
+        flushList();
+        currentList = { type: "numbered", items: [] };
+      }
+      currentList.items.push(numMatch[1]);
+    } else {
+      flushList();
+      currentPara.push(line);
+    }
+  }
+  flushPara();
+  flushList();
+  return blocks;
 }
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function renderMarkdownish(text: string, key: number): React.ReactNode {
-  // Minimal: **bold** + preserve newlines. No headings/lists rendered structurally — they appear as plain lines.
-  const segments: React.ReactNode[] = [];
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  parts.forEach((part, i) => {
+function renderInline(text: string, keyPrefix: string): React.ReactNode {
+  if (!text) return null;
+  const terms = glossary.map((g) => g.term).sort((a, b) => b.length - a.length);
+  const termPattern = terms.length > 0
+    ? new RegExp(`\\b(${terms.map(escapeRegex).join("|")})\\b`, "gi")
+    : null;
+
+  // First split by bold spans, then within each non-bold segment, match glossary terms.
+  const boldParts = text.split(/(\*\*[^*]+\*\*)/g);
+  const out: React.ReactNode[] = [];
+  let idx = 0;
+
+  for (const part of boldParts) {
     if (/^\*\*[^*]+\*\*$/.test(part)) {
-      segments.push(<strong key={`b-${key}-${i}`}>{part.slice(2, -2)}</strong>);
-    } else {
-      segments.push(<span key={`s-${key}-${i}`}>{part}</span>);
+      out.push(<strong key={`${keyPrefix}-b-${idx++}`}>{part.slice(2, -2)}</strong>);
+      continue;
     }
+    if (!termPattern) {
+      out.push(<span key={`${keyPrefix}-s-${idx++}`}>{part}</span>);
+      continue;
+    }
+    let last = 0;
+    let m: RegExpExecArray | null;
+    termPattern.lastIndex = 0;
+    while ((m = termPattern.exec(part)) !== null) {
+      if (m.index > last) {
+        out.push(
+          <span key={`${keyPrefix}-t-${idx++}`}>{part.slice(last, m.index)}</span>,
+        );
+      }
+      const matched = m[0];
+      out.push(
+        <ConceptPopover key={`${keyPrefix}-g-${idx++}`} term={matched}>
+          <span className="cursor-help underline decoration-dotted decoration-muted-foreground/60 underline-offset-2">
+            {matched}
+          </span>
+        </ConceptPopover>,
+      );
+      last = m.index + matched.length;
+    }
+    if (last < part.length) {
+      out.push(<span key={`${keyPrefix}-r-${idx++}`}>{part.slice(last)}</span>);
+    }
+  }
+  return out;
+}
+
+function renderBlocks(content: string): React.ReactNode {
+  const blocks = parseBlocks(content);
+  return blocks.map((block, i) => {
+    if (block.type === "bullets") {
+      return (
+        <ul key={`ul-${i}`} className="list-disc space-y-1 pl-5 marker:text-muted-foreground/60">
+          {block.items.map((item, j) => (
+            <li key={`li-${i}-${j}`}>{renderInline(item, `${i}-${j}`)}</li>
+          ))}
+        </ul>
+      );
+    }
+    if (block.type === "numbered") {
+      return (
+        <ol key={`ol-${i}`} className="list-decimal space-y-1 pl-5 marker:text-muted-foreground/60">
+          {block.items.map((item, j) => (
+            <li key={`li-${i}-${j}`}>{renderInline(item, `${i}-${j}`)}</li>
+          ))}
+        </ol>
+      );
+    }
+    return <p key={`p-${i}`}>{renderInline(block.text, `${i}`)}</p>;
   });
-  return <span key={`m-${key}`}>{segments}</span>;
 }
 
 export function ChatMessage({ message, onCitation }: ChatMessageProps) {
@@ -74,10 +159,10 @@ export function ChatMessage({ message, onCitation }: ChatMessageProps) {
       <div className={cn("max-w-[85%] space-y-2", isUser && "items-end")}>
         <div
           className={cn(
-            "whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+            "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
             isUser
               ? "bg-primary text-primary-foreground"
-              : "bg-card text-foreground border",
+              : "space-y-2.5 bg-card text-foreground border",
           )}
         >
           {message.content === "" ? (
@@ -86,8 +171,10 @@ export function ChatMessage({ message, onCitation }: ChatMessageProps) {
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:120ms]" />
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:240ms]" />
             </span>
+          ) : isUser ? (
+            <span className="whitespace-pre-wrap">{message.content}</span>
           ) : (
-            renderInlineContent(message.content)
+            renderBlocks(message.content)
           )}
         </div>
         {message.citations && message.citations.length > 0 && (
