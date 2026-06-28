@@ -27,7 +27,7 @@ export function Topbar() {
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-background px-5">
       <nav className="flex items-center gap-1 text-sm text-muted-foreground">
-        <Link href="/library" className="hover:text-foreground">
+        <Link href="/" className="hover:text-foreground">
           Home
         </Link>
         {segments.map((seg, i) => {
