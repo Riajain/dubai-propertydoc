@@ -10,7 +10,7 @@ import {
   Briefcase,
   Scale,
   Wallet,
-  Github,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -100,7 +100,7 @@ export default function HomePage() {
               target="_blank"
               rel="noreferrer"
             >
-              <Github className="h-4 w-4" />
+              <ExternalLink className="h-4 w-4" />
               Source on GitHub
             </a>
           </Button>
