@@ -2,6 +2,11 @@ import type { ChatMessage, Citation, ThreadKind } from "@/lib/types";
 import { getProperty } from "@/lib/mock/properties";
 import { formatAed } from "@/lib/utils";
 
+function formatHandover(d: string | undefined, opts: Intl.DateTimeFormatOptions = { month: "short", year: "numeric" }): string {
+  if (!d) return "TBA";
+  return new Date(d).toLocaleDateString("en-GB", opts);
+}
+
 interface ResponseTemplate {
   match: RegExp;
   buildResponse: (ctx: ResponseContext) => { content: string; citations?: Citation[] };
@@ -195,7 +200,7 @@ const templates: ResponseTemplate[] = [
       const profile = profiles[p.developer];
       if (profile) {
         return {
-          content: `**${p.developer}** — ${profile.stars}\n\n${profile.bullets.map((b) => `- ${b}`).join("\n")}\n\nFor ${p.name} specifically, the ${p.developer === "Sobha Realty" ? "Sobha" : p.developer.split(" ")[0]} delivery pattern means the published ${new Date(p.handoverDate).toLocaleDateString("en-GB", { month: "short", year: "numeric" })} handover is credible — budget for a 3–6 month buffer at most.`,
+          content: `**${p.developer}** — ${profile.stars}\n\n${profile.bullets.map((b) => `- ${b}`).join("\n")}\n\nFor ${p.name} specifically, the ${p.developer === "Sobha Realty" ? "Sobha" : p.developer.split(" ")[0]} delivery pattern means the published ${formatHandover(p.handoverDate)} handover is credible — budget for a 3–6 month buffer at most.`,
         };
       }
       return {
@@ -281,7 +286,7 @@ const templates: ResponseTemplate[] = [
         };
       }
       return {
-        content: `**${p.name}** at a glance:\n\n- **${p.bedrooms}BR ${p.type}**, ${p.bua.toLocaleString()} sqft BUA in **${p.community}**\n- Priced at ${formatAed(p.price)} (${formatAed(p.pricePerSqft)}/sqft)\n- Developer: **${p.developer}** · Handover: ${new Date(p.handoverDate).toLocaleDateString("en-GB", { month: "long", year: "numeric" })}\n- Service charge: AED ${p.serviceCharge}/sqft · Indicative gross yield: ${p.rentalYieldEstimate}%\n\n${p.summary}\n\n**Key findings I've already extracted:**\n\n${p.keyFindings.map((f) => `- ${f}`).join("\n")}\n\nAsk me about the **payment plan**, **yield math**, **SPA risks**, or the **community** to go deeper.`,
+        content: `**${p.name}** at a glance:\n\n- **${p.bedrooms}BR ${p.type}**, ${p.bua.toLocaleString()} sqft BUA in **${p.community}**\n- Priced at ${formatAed(p.price)} (${formatAed(p.pricePerSqft)}/sqft)\n- Developer: **${p.developer}** · Handover: ${formatHandover(p.handoverDate, { month: "long", year: "numeric" })}\n- Service charge: AED ${p.serviceCharge}/sqft · Indicative gross yield: ${p.rentalYieldEstimate}%\n\n${p.summary}\n\n**Key findings I've already extracted:**\n\n${p.keyFindings.map((f) => `- ${f}`).join("\n")}\n\nAsk me about the **payment plan**, **yield math**, **SPA risks**, or the **community** to go deeper.`,
         citations: [
           { docId: p.documents[0]?.id ?? "", docTitle: p.documents[0]?.title ?? "Brochure", page: 1, excerpt: p.summary.slice(0, 140) + "..." },
         ],
@@ -301,7 +306,7 @@ function buildFallback(ctx: ResponseContext): { content: string; citations?: Cit
   const serviceChargeAnnual = p.serviceCharge * p.bua;
   const netYield = ((annualRent - serviceChargeAnnual) / p.price) * 100;
   return {
-    content: `Here's what I know about **${p.name}** so far. Ask me anything more specific and I'll pull the supporting clause.\n\n**The basics**\n\n- ${p.bedrooms}BR ${p.type}, ${p.bua.toLocaleString()} sqft BUA in ${p.community}\n- ${formatAed(p.price)} total (${formatAed(p.pricePerSqft)}/sqft)\n- Developer: ${p.developer} · Handover ${new Date(p.handoverDate).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}\n\n**The numbers**\n\n- Gross yield: ${p.rentalYieldEstimate}% (~${formatAed(annualRent)}/yr at current market rents)\n- Service charge drag: ${formatAed(serviceChargeAnnual)}/yr at AED ${p.serviceCharge}/sqft\n- **Net yield: ${netYield.toFixed(2)}%**\n\n**What I'd flag**\n\n${p.keyFindings.map((f) => `- ${f}`).join("\n")}\n\nWhat angle do you want to dig into — financial, legal, or the area itself?`,
+    content: `Here's what I know about **${p.name}** so far. Ask me anything more specific and I'll pull the supporting clause.\n\n**The basics**\n\n- ${p.bedrooms}BR ${p.type}, ${p.bua.toLocaleString()} sqft BUA in ${p.community}\n- ${formatAed(p.price)} total (${formatAed(p.pricePerSqft)}/sqft)\n- Developer: ${p.developer} · Handover ${formatHandover(p.handoverDate)}\n\n**The numbers**\n\n- Gross yield: ${p.rentalYieldEstimate}% (~${formatAed(annualRent)}/yr at current market rents)\n- Service charge drag: ${formatAed(serviceChargeAnnual)}/yr at AED ${p.serviceCharge}/sqft\n- **Net yield: ${netYield.toFixed(2)}%**\n\n**What I'd flag**\n\n${p.keyFindings.map((f) => `- ${f}`).join("\n")}\n\nWhat angle do you want to dig into — financial, legal, or the area itself?`,
     citations: [
       { docId: p.documents[0]?.id ?? "", docTitle: p.documents[0]?.title ?? "Brochure", page: 1, excerpt: p.summary.slice(0, 140) + "..." },
     ],
